@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+
+    steps:
+      # 1. Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      # 2. Get Date
+      - name: Get Date
+        id: get-date
+        run: echo "::set-output name=date::$(/bin/date -u '+%Y%m%d')"
+        shell: bash
+
+      # 3. Cache Buildozer global directory
+      - name: Cache Buildozer global directory
+        uses: actions/cache@v2
+        with:
+          path: .buildozer_global
+          key: buildozer-global-${{ hashFiles('buildozer.spec') }}
+
+      # 4. Cache Buildozer dependencies
+      - name: Cache Buildozer dependencies
+        uses: actions/cache@v2
+        with:
+          path: .buildozer
+          key: ${{ runner.os }}-${{ steps.get-date.outputs.date }}-${{ hashFiles('buildozer.spec') }}
+
+      # 5. Install dependencies
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y openjdk-11-jdk
+          yes | pip install --upgrade pip setuptools wheel
+          yes | pip install buildozer
+
+      # 6. Build APK with Buildozer
+      - name: Build with Buildozer
+        uses: ArtemSBulgakov/buildozer-action@v1
+        id: buildozer
+        with:
+          command: android debug
+          buildozer_version: stable
+
+      # 7. Upload artifact (APK)
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: package
+          path: ${{ steps.buildozer.outputs.filename }}
